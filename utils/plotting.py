@@ -8,8 +8,8 @@ import warnings
 from typing import Optional, Tuple
 from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score
 # Import your matplotlib plotting functions if you want wrappers
-from ModelEvaluationApp.modules.prediction_holdout_analysis import plot_group_summary_stats, custom_sort_key
-from ModelEvaluationApp.modules.data_drift_analysis import plot_distribution_drift
+from modules.prediction_holdout_analysis import plot_group_summary_stats, custom_sort_key
+from modules.data_drift_analysis import plot_distribution_drift
 from .theme import PLOT_COLOR_SEQUENCE, SECONDARY_BACKGROUND_COLOR, TEXT_COLOR, GRID_COLOR, BACKGROUND_COLOR
 
 # --- Interactive Plots using Plotly ---

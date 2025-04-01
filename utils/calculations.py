@@ -8,11 +8,11 @@ from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_prec
                             precision_score, recall_score, f1_score, confusion_matrix
 from sklearn.calibration import calibration_curve
 # Import your custom calculation functions
-from ModelEvaluationApp.modules.prediction_holdout_analysis import (custom_sort_key,
+from modules.prediction_holdout_analysis import (custom_sort_key,
                                                                     calculate_rank_metrics, 
                                                                     rank_performance_by_group, 
                                                                     _create_group_column)
-from ModelEvaluationApp.modules.data_drift_analysis import (calculate_psi_with_nan, calculate_categorical_psi_with_nan, calculate_ks_test)
+from modules.data_drift_analysis import (calculate_psi_with_nan, calculate_categorical_psi_with_nan, calculate_ks_test)
 
 # --- Wrappers or direct use of your functions ---
 
