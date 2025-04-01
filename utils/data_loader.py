@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 # Import necessary classes/functions for loading
-from ResultService.result import Result # Adjust import path if needed
+#from ResultService.result import Result # Adjust import path if needed
 # Import your BigQueryClient which handles GCS
 #from IOService.gbq_client import BigQueryClient # Adjust import path
 import io
@@ -129,7 +129,7 @@ def load_result_object(result_gcs_path: str):
         st.error(f"An error occurred loading Result object from GCS: {e}")
         return None"""
 
-# --- Keep extract_evaluation_data as before ---
+"""# --- Keep extract_evaluation_data as before ---
 @st.cache_data
 def extract_evaluation_data(_result_obj: Result, dataset_key: str = 'pred'):
     # ... (Keep the implementation from the previous answer) ...
@@ -184,81 +184,4 @@ def extract_evaluation_data(_result_obj: Result, dataset_key: str = 'pred'):
          return None, None, None
     except Exception as e:
          st.error(f"Unexpected error extracting data for key '{dataset_key}': {e}")
-         return None, None, None
-
-
-# --- Functions to handle feature data (Placeholder - To be developed later) ---
-@st.cache_data
-def reconstruct_feature_dataframe(_result_obj: Result, dataset_key: str = 'pred'):
-    """
-    Placeholder: Reconstructs a DataFrame with features and scores/targets.
-    This is the complex part requiring DMatrix conversion or using the preprocessor.
-    """
-    st.info("Feature reconstruction from Result object not yet implemented.")
-    # --- Option 1: Use Preprocessor (If applicable) ---
-    # if _result_obj.preprocessor and hasattr(_result_obj.preprocessor, 'inverse_transform') and hasattr(_result_obj.preprocessor, 'get_feature_names_out'):
-    #     try:
-    #         X_transformed = None
-    #         if dataset_key == 'train': X_transformed = _result_obj.pipeline_data.X_train
-    #         elif dataset_key == 'test': X_transformed = _result_obj.pipeline_data.X_test
-    #         elif dataset_key == 'pred': X_transformed = _result_obj.pipeline_data.X_pred
-    #
-    #         if X_transformed is not None:
-    #             # Problem: inverse_transform might not exist or work easily, esp. with OHE
-    #             # You might only get the *processed* features back easily
-    #             feature_names = _result_obj.preprocessor.get_feature_names_out()
-    #             # Convert DMatrix to DataFrame/Numpy if needed first
-    #             # X_dense = X_transformed.todense() # If sparse
-    #             df_features = pd.DataFrame(X_transformed, columns=feature_names) # Adapt based on X type
-    #
-    #             # Now merge with y_true / y_scores based on index
-    #             y_true, y_scores, _ = extract_evaluation_data(_result_obj, dataset_key)
-    #             if y_true is not None and y_scores is not None:
-    #                  # Assuming index alignment holds (might be fragile)
-    #                  df_combined = pd.concat([df_features.reset_index(drop=True),
-    #                                           y_true.reset_index(drop=True).rename('y_true'),
-    #                                           y_scores.reset_index(drop=True).rename('y_pred_prob')], axis=1)
-    #                  return df_combined
-    #     except Exception as e:
-    #         st.error(f"Error reconstructing features using preprocessor: {e}")
-
-    # --- Option 2: Requires storing original features in Result object (Ideal but needs changes) ---
-    # if hasattr(_result_obj.pipeline_data, 'X_train_original'): # Check if you stored original dfs
-    #     st.warning("Loading original features is preferred but not implemented in this example.")
-    #     return None
-
-    # Fallback: return only scores/targets if feature reconstruction fails
-    y_true, y_scores, _ = extract_evaluation_data(_result_obj, dataset_key)
-    if y_true is not None and y_scores is not None:
-        return pd.DataFrame({'y_true': y_true, 'y_pred_prob': y_scores})
-
-    return None
-
-
-# --- Functions for Drift Data ---
-# Option A: Load pre-calculated drift metrics from Result object (if stored)
-@st.cache_data
-def extract_drift_metrics(_result_obj: Result):
-     """Extracts pre-calculated drift metrics DataFrame if stored in Result."""
-     # Assuming drift_metrics_df is stored in additional_info for example
-     drift_df = _result_obj.additional_info.get('drift_metrics_df')
-     if drift_df is not None and isinstance(drift_df, pd.DataFrame):
-          # Add validation for expected columns
-          return drift_df
-     else:
-          st.warning("Pre-calculated drift metrics not found in Result object's additional_info.")
-          return None
-
-# Option B: Extract necessary dataframes to calculate drift on the fly (if stored)
-@st.cache_data
-def extract_data_for_drift_calc(_result_obj: Result):
-    """Extracts training and prediction features/data needed for drift calc."""
-    # This depends heavily on what's stored in PipelineData
-    # You might need X_train_original, X_pred_original for direct comparison
-    # Or the SequenceFeatureExtractor artifacts to regenerate comparable features
-    st.warning("Extracting raw data for on-the-fly drift calculation not fully implemented.")
-    # Example: Assuming original DFs were stored (unlikely for DMatrix)
-    # train_df = _result_obj.pipeline_data.get('X_train_original')
-    # pred_df = _result_obj.pipeline_data.get('X_pred_original')
-    train_df, pred_df = None, None # Placeholder
-    return train_df, pred_df
+         return None, None, None"""
