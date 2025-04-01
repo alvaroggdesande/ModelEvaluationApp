@@ -6,12 +6,12 @@ import numpy as np
 import warnings
 
 # Import drift calculation and plotting functions
-from ModelEvaluationApp.modules.data_drift_analysis import (
+from modules.data_drift_analysis import (
     calculate_drift_metrics,
     # plot_drift_summary, # This used matplotlib, let's use the plotly version
     # plot_top_feature_distributions # This used matplotlib grid
 )
-from ModelEvaluationApp.utils.plotting import (
+from utils.plotting import (
     plot_distribution_comparison_interactive, # Use the plotly version
     plot_drift_summary_interactive # Use the plotly version
 )

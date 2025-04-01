@@ -8,14 +8,14 @@ import plotly.graph_objects as go
 import warnings
 
 # Import calculation functions (reusable)
-from ModelEvaluationApp.utils.calculations import (
+from utils.calculations import (
     get_metrics_at_threshold,
     get_calibration_data,
     calculate_rank_metrics,
     calculate_descriptive_stats
 )
 # Import PLOTTING functions - including NEW comparison ones
-from ModelEvaluationApp.utils.plotting import (
+from utils.plotting import (
     plot_roc_comparison_interactive,        # NEW
     plot_pr_comparison_interactive,         # NEW
     plot_calibration_comparison_interactive,# NEW

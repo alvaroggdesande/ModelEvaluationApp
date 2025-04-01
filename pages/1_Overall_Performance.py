@@ -6,14 +6,14 @@ import plotly.graph_objects as go
 import warnings
 
 # Import calculation functions
-from ModelEvaluationApp.utils.calculations import (
+from utils.calculations import (
     get_metrics_at_threshold,
     get_calibration_data,
     calculate_rank_metrics,
     calculate_descriptive_stats
 )
 # Import plotting functions
-from ModelEvaluationApp.utils.plotting import (
+from utils.plotting import (
     plot_roc_curve_interactive,
     plot_pr_curve_interactive,
     plot_calibration_interactive,

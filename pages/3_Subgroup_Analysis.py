@@ -8,13 +8,13 @@ import plotly.graph_objects as go
 import warnings
 
 # Import necessary functions from your modules/utils
-from ModelEvaluationApp.utils.calculations import calculate_subgroup_means
-from ModelEvaluationApp.utils.plotting import (
+from utils.calculations import calculate_subgroup_means
+from utils.plotting import (
     plot_group_summary_stats_plotly,
     plot_rank_metrics_by_group_interactive,
     plot_subgroup_means_interactive
 )
-from ModelEvaluationApp.modules.prediction_holdout_analysis import rank_performance_by_group
+from modules.prediction_holdout_analysis import rank_performance_by_group
 
 # --- Page Config ---
 st.set_page_config(layout="wide")

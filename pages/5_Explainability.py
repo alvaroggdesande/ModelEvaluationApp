@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import warnings
 
 # Import helpers if needed
-from ModelEvaluationApp.utils.shap_helpers import aggregate_shap_importance
+from utils.shap_helpers import aggregate_shap_importance
 
 st.set_page_config(layout="wide")
 st.header("Model Explainability (SHAP)")
