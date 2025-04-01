@@ -2,15 +2,15 @@
 import streamlit as st
 import pandas as pd
 # Use the CSV/Parquet loader
-from ModelEvaluationApp.utils.data_loader import load_prediction_data
+from utils.data_loader import load_prediction_data
 # Import other necessary utilities if needed later
 # Import SHAP loading and calculation
-from ModelEvaluationApp.utils.shap_helpers import (load_shap_data
-                                                   , calculate_global_shap_importance
-                                                   , aggregate_shap_importance)
+from utils.shap_helpers import (load_shap_data
+                                , calculate_global_shap_importance
+                                , aggregate_shap_importance)
 # from utils.data_loader import extract_evaluation_data, reconstruct_feature_dataframe
 # Import your color definitions
-from ModelEvaluationApp.utils.theme import (
+from utils.theme import (
     PRIMARY_COLOR, BACKGROUND_COLOR, SECONDARY_BACKGROUND_COLOR,
     TEXT_COLOR, PLOT_COLOR_SEQUENCE, GRID_COLOR
 )
