@@ -19,14 +19,12 @@ where possible for better interpretability in relevant plots (Beeswarm, Dependen
 **Requires SHAP data (Values, Features, Base Value, Display Data) to be loaded on the '🚀 Home' page.**
 """)
 
-# --- Data Check ---
-if 'shap_data_dict' not in st.session_state or st.session_state['shap_data_dict'] is None:
-    st.warning("❗ SHAP data not loaded. Please load it on the '🚀 Home' page sidebar.")
-    st.stop()
-# Ensure importance_df_raw exists, crucial for feature ordering
 if 'shap_importance_df_raw' not in st.session_state or st.session_state['shap_importance_df_raw'] is None:
-     st.warning("❗ SHAP importance calculation failed or data not loaded. Cannot determine feature order.")
-     st.stop()
+    st.warning("❗ SHAP importance data not loaded. Please load pre-calculated importance files on the '🚀 Home' page sidebar.")
+    st.stop()
+
+importance_df_raw = st.session_state['shap_importance_df_raw']
+importance_df_agg = st.session_state.get('shap_importance_df_agg')
 
 # Retrieve loaded SHAP components
 shap_data = st.session_state['shap_data_dict']
@@ -60,56 +58,57 @@ max_samples_for_plots = st.sidebar.number_input(
 )
 
 
-# --- Global Feature Importance ---
+# --- Global Feature Importance Section (Modify slightly) ---
 st.subheader("Global Feature Importance")
 st.markdown("""
-Shows the average impact (mean absolute SHAP value) of each feature (as seen by the model)
-on the model output magnitude. Features are ordered by importance, and less important features
-are automatically grouped.
+Shows the average impact (mean absolute SHAP value) of each feature.
+Importance data was pre-calculated.
 """)
-
 if importance_df_raw is not None and not importance_df_raw.empty:
+    # Plotting logic using importance_df_raw (using plotly or matplotlib bar chart)
+    # You can create a simple bar chart directly from the DataFrame
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        import plotly.express as px
+        fig_imp = px.bar(
+            importance_df_raw.head(max_display_features), # Use slider value
+            x='feature_importance',
+            y='feature',
+            orientation='h',
+            title="Global Feature Importance (Processed Features)",
+            labels={'feature_importance': 'Mean Absolute SHAP Value', 'feature': 'Feature'}
+        )
+        fig_imp.update_layout(yaxis={'categoryorder':'total ascending'}) # Show highest importance at top
+        st.plotly_chart(fig_imp, use_container_width=True)
 
-            # --- Create SHAP Explanation object for consistency ---
-            # This often helps SHAP plots behave as expected, especially with aggregation
-            explanation_full = shap.Explanation(
-                values=shap_values,
-                base_values=base_value,
-                data=processed_data, # Include display data if available
-                feature_names=feature_names
-            )
-
-            plt.figure() # Create a figure context for SHAP
-            # Pass the Explanation object to the bar plot
-            shap.summary_plot(
-                explanation_full,     # Pass Explanation object
-                plot_type='bar',
-                max_display=max_display_features,
-                show=False
-            )
-            plt.title("Global Feature Importance (Processed Features)")
-            plt.xlabel("Mean Absolute SHAP Value (|SHAP value|)")
-            plt.tight_layout()
-            st.pyplot(plt.gcf())
-            plt.clf() # Clear the figure
-
-        # --- Optional: Expander for Aggregated Importance Table ---
-        # ... (expander code remains the same) ...
+        # Optional: Expander for Aggregated Importance Table
+        if importance_df_agg is not None and not importance_df_agg.empty:
+            with st.expander("Show Aggregated Importance (Original Features)"):
+                st.dataframe(importance_df_agg)
+        else:
+             st.caption("Aggregated importance data not loaded.")
 
     except Exception as e:
-        st.error(f"Could not generate global importance bar plot: {e}")
-
+        st.error(f"Could not generate importance bar plot: {e}")
 else:
-    st.warning("Raw SHAP importance data is not available.")
-
+     st.warning("Importance data not available.")
 
 st.markdown("---")
 
 
-# --- Apply Sampling Logic ONCE before Beeswarm and Dependence ---
+# --- Disable other SHAP sections ---
+st.markdown("---")
+st.subheader("SHAP Summary Plot (Beeswarm)")
+st.info("Beeswarm plot requires loading full (or sampled) raw SHAP values, which is disabled when using pre-calculated importance due to memory constraints.")
+
+st.markdown("---")
+st.subheader("SHAP Dependence Plots")
+st.info("Dependence plots require loading full (or sampled) raw SHAP values and display data, which is disabled when using pre-calculated importance due to memory constraints.")
+
+st.markdown("---")
+st.subheader("Local Explanation (Waterfall Plot)")
+st.info("Waterfall plots require loading full (or sampled) raw SHAP values, which is disabled when using pre-calculated importance due to memory constraints.")
+
+"""# --- Apply Sampling Logic ONCE before Beeswarm and Dependence ---
 shap_values_sampled = shap_values
 processed_data_sampled = processed_data
 sample_indices = None
@@ -127,14 +126,14 @@ else:
 
 # --- SHAP Summary Plot (Beeswarm) ---
 st.subheader("SHAP Summary Plot (Beeswarm)")
-st.markdown(f"""
+st.markdown(f
 Visualizes the SHAP value distribution for the **top {max_display_features} most important features** across the {'sampled (' + str(max_samples_for_plots) + ')' if sample_indices is not None else 'full'} dataset.
 - Each point is a SHAP value for a specific feature and sample.
 - Y-axis: Features (ordered by global importance based on the **full dataset**).
 - X-axis: SHAP value (impact on prediction).
 - Color: Feature value (High=Red, Low=Blue). Requires 'Display Data'.
 - *Note: This plot only shows top features. See the bar plot above for the aggregated impact of 'Other Features'.*
-""")
+)
 
 # --- Get Top N Feature Indices and Names based on FULL importance_df_raw ---
 top_feature_names = importance_df_raw.head(max_display_features)['feature'].tolist()
@@ -214,11 +213,11 @@ st.markdown("---")
 
 # --- SHAP Dependence Plots ---
 st.subheader("SHAP Dependence Plots")
-st.markdown(f"""
+st.markdown(f
 Shows how the model's prediction for a single feature depends on its value, using the
 {'sampled (' + str(max_samples_for_plots) + ')' if sample_indices is not None else 'full'} dataset.
 Vertical dispersion indicates interaction effects. Requires 'Display Data'.
-""")
+)
 
 if processed_data_sampled is not None: # Check if sampled display data exists
     col_dep1, col_dep2 = st.columns(2)
@@ -271,11 +270,11 @@ st.markdown("---")
 
 # --- Local Explanation (Waterfall Plot) ---
 st.subheader("Local Explanation (Waterfall Plot)")
-st.markdown("""
+st.markdown(
 Explains a single prediction. Shows how features contributed to push the prediction
 from the base value (average prediction) to the final predicted value for that instance.
 Select an instance using the options below.
-""")
+)
 
 # --- Check if Prediction Data is available for score-based selection ---
 pred_df = st.session_state.get('pred_df')
@@ -408,4 +407,4 @@ if instance_index >= 0 and instance_index < n_samples_total: # Check against tot
          # st.error(traceback.format_exc()) # Uncomment for detailed debugging
 
 else:
-    st.warning("Invalid sample index selected.")
+    st.warning("Invalid sample index selected.")"""

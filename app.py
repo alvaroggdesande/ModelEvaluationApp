@@ -129,96 +129,82 @@ if uploaded_ref_file is not None:
 
 # --- >>> NEW: SHAP Data Uploaders <<< ---
 st.sidebar.markdown("---")
-st.sidebar.header("Load SHAP Data (Optional)")
-st.sidebar.caption("For Explainability page and enhanced Drift analysis.")
-
-uploaded_shap_values_file = st.sidebar.file_uploader(
-    "3. SHAP Values (Positive Class)",
-    type=["npy", "csv"], help=".npy array or .csv (samples x features)", key="shap_values_uploader"
+st.sidebar.header("Load SHAP Importance (Pre-calculated)")
+uploaded_shap_importance_raw_file = st.sidebar.file_uploader(
+    "3. Upload Raw SHAP Importance*",
+    type=["csv", "parquet"], help="Pre-calculated mean abs SHAP per processed feature.",
+    key="shap_importance_raw_uploader"
 )
-uploaded_shap_features_file = st.sidebar.file_uploader(
-    "4. SHAP Feature Names",
-    type=["json", "txt"], help=".json list or .txt (one per line)", key="shap_features_uploader"
-)
-uploaded_shap_base_value_file = st.sidebar.file_uploader(
-    "5. SHAP Base Value",
-    type=["json", "txt"], help=".json {'base_value': x} or .txt (single number)", key="shap_base_uploader"
-)
-uploaded_shap_processed_data_file = st.sidebar.file_uploader(
-    "6. Data for SHAP Display*", # Changed label
-    type=["parquet", "csv"],
-    help="*Recommended: Data corresponding to SHAP values, ideally inverse-transformed where possible (samples x features). Required for beeswarm/dependence plots.", # Updated help text
-    key="shap_data_uploader"
+uploaded_shap_importance_agg_file = st.sidebar.file_uploader(
+    "4. Upload Aggregated SHAP Importance (Optional)",
+    type=["csv", "parquet"], help="Pre-calculated SHAP importance aggregated to original features.",
+    key="shap_importance_agg_uploader"
 )
 
-# Load SHAP data if all required files are uploaded and haven't been loaded before
-required_shap_files = [uploaded_shap_values_file, uploaded_shap_features_file, uploaded_shap_base_value_file]
-if all(required_shap_files):
-    # Check if any of the SHAP files are new
-    new_shap_file_uploaded = False
-    if st.session_state.get('shap_values_file_name') != uploaded_shap_values_file.name:
-        new_shap_file_uploaded = True
-        st.session_state['shap_values_file_name'] = uploaded_shap_values_file.name
-    if st.session_state.get('shap_features_file_name') != uploaded_shap_features_file.name:
-        new_shap_file_uploaded = True
-        st.session_state['shap_features_file_name'] = uploaded_shap_features_file.name
-    if st.session_state.get('shap_base_value_file_name') != uploaded_shap_base_value_file.name:
-        new_shap_file_uploaded = True
-        st.session_state['shap_base_value_file_name'] = uploaded_shap_base_value_file.name
-    # Check optional file change
-    if uploaded_shap_processed_data_file and \
-       st.session_state.get('shap_processed_data_file_name') != uploaded_shap_processed_data_file.name:
-        new_shap_file_uploaded = True
-        st.session_state['shap_processed_data_file_name'] = uploaded_shap_processed_data_file.name
-    elif not uploaded_shap_processed_data_file and st.session_state.get('shap_processed_data_file_name') is not None:
-         # Handle case where optional file is removed
-         new_shap_file_uploaded = True
-         st.session_state['shap_processed_data_file_name'] = None
+# --- Inside the loading logic ---
+# Reset dependent states if files change
+new_shap_importance_file = False
+if uploaded_shap_importance_raw_file and \
+   st.session_state.get('shap_importance_raw_file_name') != uploaded_shap_importance_raw_file.name:
+    new_shap_importance_file = True
+    st.session_state['shap_importance_raw_file_name'] = uploaded_shap_importance_raw_file.name
+
+if uploaded_shap_importance_agg_file and \
+   st.session_state.get('shap_importance_agg_file_name') != uploaded_shap_importance_agg_file.name:
+    new_shap_importance_file = True
+    st.session_state['shap_importance_agg_file_name'] = uploaded_shap_importance_agg_file.name
+elif not uploaded_shap_importance_agg_file and st.session_state.get('shap_importance_agg_file_name') is not None:
+    new_shap_importance_file = True
+    st.session_state['shap_importance_agg_file_name'] = None
 
 
-    # If any file changed or SHAP data isn't loaded yet, attempt loading
-    if new_shap_file_uploaded or st.session_state.get('shap_data_dict') is None:
-        st.sidebar.info("Attempting to load SHAP data...")
-        shap_data_dict_loaded = load_shap_data(
-            uploaded_shap_values_file,
-            uploaded_shap_features_file,
-            uploaded_shap_base_value_file,
-            uploaded_shap_processed_data_file # Pass optional file
-        )
-        if shap_data_dict_loaded:
-            st.session_state['shap_data_dict'] = shap_data_dict_loaded
-            st.sidebar.success("SHAP data loaded!")
-            # --- Calculate Importance on Load ---
-            with st.spinner("Calculating SHAP importance..."):
-                 st.session_state['shap_importance_df_raw'] = calculate_global_shap_importance(
-                     st.session_state['shap_data_dict']['shap_values'],
-                     st.session_state['shap_data_dict']['feature_names']
-                 )
-                 # Try to calculate aggregated importance if prediction data is loaded
-                 if st.session_state['pred_df'] is not None:
-                     try:
-                         # Exclude non-feature columns from original list
-                         cols_to_exclude_agg = ['y_true', 'y_pred_prob', 'ContactId', 'EntityId', 'ResponseTimestamp', 'rank', 'bin', 'group', '_merge']
-                         original_cols = [c for c in st.session_state['pred_df'].columns if c not in cols_to_exclude_agg]
-                         st.session_state['shap_importance_df_agg'] = aggregate_shap_importance(
-                             st.session_state['shap_importance_df_raw'],
-                             original_cols
-                         )
-                     except Exception as agg_e:
-                          st.warning(f"Could not calculate aggregated SHAP importance: {agg_e}")
-                          st.session_state['shap_importance_df_agg'] = None
-                 else:
-                     st.session_state['shap_importance_df_agg'] = None
+if new_shap_importance_file or st.session_state.get('shap_importance_df_raw') is None:
+    st.session_state['shap_data_dict'] = None # Clear old dict if it existed
+    st.session_state['shap_importance_df_raw'] = None
+    st.session_state['shap_importance_df_agg'] = None
+    st.session_state['drift_importance_df'] = None # Reset drift merge
 
-            st.session_state['drift_importance_df'] = None # Reset merged drift df
-        else:
-            st.sidebar.error("Failed to load SHAP data.")
-            st.session_state['shap_data_dict'] = None
+    if uploaded_shap_importance_raw_file:
+        st.sidebar.info("Loading pre-calculated SHAP importance...")
+        try:
+            if uploaded_shap_importance_raw_file.name.endswith('.csv'):
+                raw_imp_df = pd.read_csv(uploaded_shap_importance_raw_file)
+            else: # parquet
+                raw_imp_df = pd.read_parquet(uploaded_shap_importance_raw_file)
+
+            # Validate essential columns
+            if 'feature' in raw_imp_df.columns and 'feature_importance' in raw_imp_df.columns:
+                st.session_state['shap_importance_df_raw'] = raw_imp_df.sort_values('feature_importance', ascending=False).reset_index(drop=True)
+                st.sidebar.success("Raw SHAP importance loaded!")
+
+                # Try loading aggregated importance if provided
+                if uploaded_shap_importance_agg_file:
+                    try:
+                        if uploaded_shap_importance_agg_file.name.endswith('.csv'):
+                             agg_imp_df = pd.read_csv(uploaded_shap_importance_agg_file)
+                        else: # parquet
+                             agg_imp_df = pd.read_parquet(uploaded_shap_importance_agg_file)
+
+                        if 'original_feature' in agg_imp_df.columns and 'aggregated_importance' in agg_imp_df.columns:
+                             st.session_state['shap_importance_df_agg'] = agg_imp_df.sort_values('aggregated_importance', ascending=False).reset_index(drop=True)
+                             st.sidebar.success("Aggregated SHAP importance loaded!")
+                        else:
+                             st.sidebar.warning("Aggregated importance file missing required columns ('original_feature', 'aggregated_importance').")
+                             st.session_state['shap_importance_df_agg'] = None # Ensure it's None
+                    except Exception as e_agg:
+                        st.sidebar.error(f"Failed to load aggregated importance: {e_agg}")
+                        st.session_state['shap_importance_df_agg'] = None
+                else:
+                    st.session_state['shap_importance_df_agg'] = None # Explicitly set to None if file not uploaded
+
+            else:
+                st.sidebar.error("Raw importance file missing required columns ('feature', 'feature_importance').")
+                st.session_state['shap_importance_df_raw'] = None # Ensure it's None
+
+        except Exception as e_raw:
+            st.sidebar.error(f"Failed to load raw importance: {e_raw}")
             st.session_state['shap_importance_df_raw'] = None
             st.session_state['shap_importance_df_agg'] = None
-
-elif any(required_shap_files):
-    st.sidebar.warning("Please upload all required SHAP files (Values, Features, Base Value).")
 
 
 # --- >>> NEW: Dataset Selector for Analysis <<< ---
@@ -279,16 +265,21 @@ else:
     data_summary.append("ℹ️ Reference Data: **Not Loaded** (Optional)")
 
 # SHAP Data Status
-if st.session_state['shap_data_dict'] is not None:
-    shap_status = "✅ SHAP Data: **Loaded**"
-    if st.session_state['shap_importance_df_raw'] is not None:
-         shap_status += f" ({len(st.session_state['shap_importance_df_raw'])} features)"
-    if st.session_state['shap_data_dict'].get('processed_data') is None:
-        shap_status += " *(Processed Data missing)*"
+if st.session_state.get('shap_importance_df_raw') is not None:
+    shap_status = "✅ SHAP Importance: **Loaded (Pre-calculated)**"
+    shap_status += f" ({len(st.session_state['shap_importance_df_raw'])} processed features)"
+    if st.session_state.get('shap_importance_df_agg') is not None:
+         shap_status += f" ({len(st.session_state['shap_importance_df_agg'])} aggregated features)"
+    data_summary.append(shap_status)
+    # Add note that interactive plots are disabled
+    st.sidebar.info("Note: Interactive SHAP plots (Beeswarm, Dependence, Waterfall) are disabled when using pre-calculated importance.", icon="ℹ️")
+
+elif st.session_state.get('shap_data_dict') is not None: # Existing check if full data was loaded
+    shap_status = "✅ SHAP Data: **Loaded (Full)**"
+    # ... rest of existing status ...
     data_summary.append(shap_status)
 else:
-    data_summary.append("ℹ️ SHAP Data: **Not Loaded** (Optional)")
-
+    data_summary.append("ℹ️ SHAP Data/Importance: **Not Loaded** (Optional)")
 
 st.markdown("\n".join([f"- {s}" for s in data_summary]))
 
