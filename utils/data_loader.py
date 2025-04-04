@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 # Import necessary classes/functions for loading
-#from ResultService.result import Result # Adjust import path if needed
+#from utils.result import Result # Adjust import path if needed
 # Import your BigQueryClient which handles GCS
 #from IOService.gbq_client import BigQueryClient # Adjust import path
 import io
@@ -185,3 +185,51 @@ def extract_evaluation_data(_result_obj: Result, dataset_key: str = 'pred'):
     except Exception as e:
          st.error(f"Unexpected error extracting data for key '{dataset_key}': {e}")
          return None, None, None"""
+
+
+# --- Functions to handle feature data (Placeholder - To be developed later) ---
+#@st.cache_data
+#def reconstruct_feature_dataframe(_result_obj: Result, dataset_key: str = 'pred'):
+    
+    #Placeholder: Reconstructs a DataFrame with features and scores/targets.
+    #This is the complex part requiring DMatrix conversion or using the preprocessor.
+    
+    #st.info("Feature reconstruction from Result object not yet implemented.")
+    # --- Option 1: Use Preprocessor (If applicable) ---
+    # if _result_obj.preprocessor and hasattr(_result_obj.preprocessor, 'inverse_transform') and hasattr(_result_obj.preprocessor, 'get_feature_names_out'):
+    #     try:
+    #         X_transformed = None
+    #         if dataset_key == 'train': X_transformed = _result_obj.pipeline_data.X_train
+    #         elif dataset_key == 'test': X_transformed = _result_obj.pipeline_data.X_test
+    #         elif dataset_key == 'pred': X_transformed = _result_obj.pipeline_data.X_pred
+    #
+    #         if X_transformed is not None:
+    #             # Problem: inverse_transform might not exist or work easily, esp. with OHE
+    #             # You might only get the *processed* features back easily
+    #             feature_names = _result_obj.preprocessor.get_feature_names_out()
+    #             # Convert DMatrix to DataFrame/Numpy if needed first
+    #             # X_dense = X_transformed.todense() # If sparse
+    #             df_features = pd.DataFrame(X_transformed, columns=feature_names) # Adapt based on X type
+    #
+    #             # Now merge with y_true / y_scores based on index
+    #             y_true, y_scores, _ = extract_evaluation_data(_result_obj, dataset_key)
+    #             if y_true is not None and y_scores is not None:
+    #                  # Assuming index alignment holds (might be fragile)
+    #                  df_combined = pd.concat([df_features.reset_index(drop=True),
+    #                                           y_true.reset_index(drop=True).rename('y_true'),
+    #                                           y_scores.reset_index(drop=True).rename('y_pred_prob')], axis=1)
+    #                  return df_combined
+    #     except Exception as e:
+    #         st.error(f"Error reconstructing features using preprocessor: {e}")
+
+    # --- Option 2: Requires storing original features in Result object (Ideal but needs changes) ---
+    # if hasattr(_result_obj.pipeline_data, 'X_train_original'): # Check if you stored original dfs
+    #     st.warning("Loading original features is preferred but not implemented in this example.")
+    #     return None
+
+    # Fallback: return only scores/targets if feature reconstruction fails
+    #y_true, y_scores, _ = extract_evaluation_data(_result_obj, dataset_key)
+    #if y_true is not None and y_scores is not None:
+    #    return pd.DataFrame({'y_true': y_true, 'y_pred_prob': y_scores})
+
+    #return None

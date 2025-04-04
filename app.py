@@ -1,6 +1,7 @@
 # app.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 # Use the CSV/Parquet loader
 from utils.data_loader import load_prediction_data
 # Import other necessary utilities if needed later
@@ -80,6 +81,13 @@ if 'shap_features_file_name' not in st.session_state: st.session_state['shap_fea
 if 'shap_base_value_file_name' not in st.session_state: st.session_state['shap_base_value_file_name'] = None
 if 'shap_processed_data_file_name' not in st.session_state: st.session_state['shap_processed_data_file_name'] = None
 
+# Add state for sampled scores and indices
+if 'shap_sampled_scores' not in st.session_state: st.session_state['shap_sampled_scores'] = None
+if 'shap_sampled_indices' not in st.session_state: st.session_state['shap_sampled_indices'] = None
+# Add state for file names of new files
+if 'shap_sampled_scores_file_name' not in st.session_state: st.session_state['shap_sampled_scores_file_name'] = None
+if 'shap_sampled_indices_file_name' not in st.session_state: st.session_state['shap_sampled_indices_file_name'] = None
+
 # --- Sidebar for Data Upload ---
 with st.sidebar:
     st.image("allyy_2025_transparent_svg.svg", width=200)
@@ -127,84 +135,145 @@ if uploaded_ref_file is not None:
             st.sidebar.error("Failed to load reference data.")
             st.session_state['ref_df'] = None
 
-# --- >>> NEW: SHAP Data Uploaders <<< ---
+# --- >>> REVERTED: SHAP Data Uploaders <<< ---
 st.sidebar.markdown("---")
-st.sidebar.header("Load SHAP Importance (Pre-calculated)")
-uploaded_shap_importance_raw_file = st.sidebar.file_uploader(
-    "3. Upload Raw SHAP Importance*",
-    type=["csv", "parquet"], help="Pre-calculated mean abs SHAP per processed feature.",
-    key="shap_importance_raw_uploader"
+st.sidebar.header("Load SHAP Data (Sampled)") # Update header
+st.sidebar.caption("Explainability uses data from a SAMPLE.") # Add caption
+
+# Revert to original 4 SHAP file uploaders
+uploaded_shap_values_file = st.sidebar.file_uploader(
+    "3. SHAP Values (Sampled)", # Updated label
+    type=["npy"], help=".npy array (samples x features) - From Sampled Data", key="shap_values_uploader"
 )
-uploaded_shap_importance_agg_file = st.sidebar.file_uploader(
-    "4. Upload Aggregated SHAP Importance (Optional)",
-    type=["csv", "parquet"], help="Pre-calculated SHAP importance aggregated to original features.",
-    key="shap_importance_agg_uploader"
+uploaded_shap_features_file = st.sidebar.file_uploader(
+    "4. SHAP Feature Names (Full List)", # Updated label
+    type=["json", "txt"], help=".json list or .txt (one per line) - Full list matching columns", key="shap_features_uploader"
+)
+uploaded_shap_base_value_file = st.sidebar.file_uploader(
+    "5. SHAP Base Value",
+    type=["json", "txt"], help=".json {'base_value': x} or .txt (single number)", key="shap_base_uploader"
+)
+uploaded_shap_processed_data_file = st.sidebar.file_uploader(
+    "6. Display Data (Sampled)*", # Updated label
+    type=["parquet", "csv"],
+    help="*Recommended: Data corresponding to SAMPLED SHAP values, inverse-transformed where possible.", # Updated help text
+    key="shap_data_uploader"
+)
+# --- NEW Uploaders for Sampled Scores/Indices ---
+uploaded_shap_sampled_scores_file = st.sidebar.file_uploader(
+    "7. Sampled Prediction Scores",
+    type=["npy"], help=".npy array (prediction probabilities for the SHAP sample)", key="shap_scores_uploader"
+)
+uploaded_shap_sampled_indices_file = st.sidebar.file_uploader(
+    "8. Sampled Original Indices",
+    type=["npy"], help=".npy array (original row indices of the SHAP sample)", key="shap_indices_uploader"
 )
 
-# --- Inside the loading logic ---
-# Reset dependent states if files change
-new_shap_importance_file = False
-if uploaded_shap_importance_raw_file and \
-   st.session_state.get('shap_importance_raw_file_name') != uploaded_shap_importance_raw_file.name:
-    new_shap_importance_file = True
-    st.session_state['shap_importance_raw_file_name'] = uploaded_shap_importance_raw_file.name
 
-if uploaded_shap_importance_agg_file and \
-   st.session_state.get('shap_importance_agg_file_name') != uploaded_shap_importance_agg_file.name:
-    new_shap_importance_file = True
-    st.session_state['shap_importance_agg_file_name'] = uploaded_shap_importance_agg_file.name
-elif not uploaded_shap_importance_agg_file and st.session_state.get('shap_importance_agg_file_name') is not None:
-    new_shap_importance_file = True
-    st.session_state['shap_importance_agg_file_name'] = None
+# --- Reverted SHAP Loading Logic ---
+# Now requires the two new files as well
+required_shap_files = [
+    uploaded_shap_values_file, uploaded_shap_features_file, uploaded_shap_base_value_file,
+    uploaded_shap_sampled_scores_file, uploaded_shap_sampled_indices_file # Add required new files
+]
+# Optional file is still processed_data
+optional_shap_files = [uploaded_shap_processed_data_file]
 
+if all(required_shap_files): # Check if all *required* files are uploaded
+    # Check if any file is new
+    new_shap_file_uploaded = False
+    if st.session_state.get('shap_values_file_name') != uploaded_shap_values_file.name: new_shap_file_uploaded = True; st.session_state['shap_values_file_name'] = uploaded_shap_values_file.name
+    if st.session_state.get('shap_features_file_name') != uploaded_shap_features_file.name: new_shap_file_uploaded = True; st.session_state['shap_features_file_name'] = uploaded_shap_features_file.name
+    if st.session_state.get('shap_base_value_file_name') != uploaded_shap_base_value_file.name: new_shap_file_uploaded = True; st.session_state['shap_base_value_file_name'] = uploaded_shap_base_value_file.name
+    # Check new required files
+    if st.session_state.get('shap_sampled_scores_file_name') != uploaded_shap_sampled_scores_file.name: new_shap_file_uploaded = True; st.session_state['shap_sampled_scores_file_name'] = uploaded_shap_sampled_scores_file.name
+    if st.session_state.get('shap_sampled_indices_file_name') != uploaded_shap_sampled_indices_file.name: new_shap_file_uploaded = True; st.session_state['shap_sampled_indices_file_name'] = uploaded_shap_sampled_indices_file.name
 
-if new_shap_importance_file or st.session_state.get('shap_importance_df_raw') is None:
-    st.session_state['shap_data_dict'] = None # Clear old dict if it existed
-    st.session_state['shap_importance_df_raw'] = None
-    st.session_state['shap_importance_df_agg'] = None
-    st.session_state['drift_importance_df'] = None # Reset drift merge
+    # Check optional file change
+    if uploaded_shap_processed_data_file and st.session_state.get('shap_processed_data_file_name') != uploaded_shap_processed_data_file.name:
+        new_shap_file_uploaded = True; st.session_state['shap_processed_data_file_name'] = uploaded_shap_processed_data_file.name
+    elif not uploaded_shap_processed_data_file and st.session_state.get('shap_processed_data_file_name') is not None:
+         new_shap_file_uploaded = True; st.session_state['shap_processed_data_file_name'] = None # Handle removal
 
-    if uploaded_shap_importance_raw_file:
-        st.sidebar.info("Loading pre-calculated SHAP importance...")
+    # If any file changed or SHAP data isn't loaded yet, attempt loading
+    # Reset importance and drift merge if new files are loaded
+    if new_shap_file_uploaded or st.session_state.get('shap_data_dict') is None:
+        st.session_state['shap_importance_df_raw'] = None # Reset importance
+        st.session_state['shap_importance_df_agg'] = None
+        st.session_state['drift_importance_df'] = None # Reset drift merge
+        st.session_state['shap_sampled_scores'] = None # Reset sample specifics
+        st.session_state['shap_sampled_indices'] = None
+
+        st.sidebar.info("Attempting to load SAMPLED SHAP data...")
+
+        # --- Update load_shap_data to handle new files ---
+        # You might need to modify the load_shap_data function itself
+        # OR load the new files separately here. Let's load separately for now.
+        shap_data_dict_loaded = load_shap_data( # Assumes load_shap_data handles the first 4 args
+            uploaded_shap_values_file,
+            uploaded_shap_features_file,
+            uploaded_shap_base_value_file,
+            uploaded_shap_processed_data_file # Pass optional file
+        )
+
+        # Load sampled scores and indices separately
+        sampled_scores_loaded = None
+        sampled_indices_loaded = None
         try:
-            if uploaded_shap_importance_raw_file.name.endswith('.csv'):
-                raw_imp_df = pd.read_csv(uploaded_shap_importance_raw_file)
-            else: # parquet
-                raw_imp_df = pd.read_parquet(uploaded_shap_importance_raw_file)
+            sampled_scores_loaded = np.load(uploaded_shap_sampled_scores_file)
+            sampled_indices_loaded = np.load(uploaded_shap_sampled_indices_file)
+        except Exception as e:
+             st.sidebar.error(f"Failed to load sampled scores/indices .npy files: {e}")
+             # Invalidate the main SHAP load if these fail, as they are required now
+             shap_data_dict_loaded = None
 
-            # Validate essential columns
-            if 'feature' in raw_imp_df.columns and 'feature_importance' in raw_imp_df.columns:
-                st.session_state['shap_importance_df_raw'] = raw_imp_df.sort_values('feature_importance', ascending=False).reset_index(drop=True)
-                st.sidebar.success("Raw SHAP importance loaded!")
+        if shap_data_dict_loaded and sampled_scores_loaded is not None and sampled_indices_loaded is not None:
+            st.session_state['shap_data_dict'] = shap_data_dict_loaded
+            st.session_state['shap_sampled_scores'] = sampled_scores_loaded
+            st.session_state['shap_sampled_indices'] = sampled_indices_loaded
 
-                # Try loading aggregated importance if provided
-                if uploaded_shap_importance_agg_file:
-                    try:
-                        if uploaded_shap_importance_agg_file.name.endswith('.csv'):
-                             agg_imp_df = pd.read_csv(uploaded_shap_importance_agg_file)
-                        else: # parquet
-                             agg_imp_df = pd.read_parquet(uploaded_shap_importance_agg_file)
+            st.sidebar.success("SAMPLED SHAP data loaded!")
 
-                        if 'original_feature' in agg_imp_df.columns and 'aggregated_importance' in agg_imp_df.columns:
-                             st.session_state['shap_importance_df_agg'] = agg_imp_df.sort_values('aggregated_importance', ascending=False).reset_index(drop=True)
-                             st.sidebar.success("Aggregated SHAP importance loaded!")
-                        else:
-                             st.sidebar.warning("Aggregated importance file missing required columns ('original_feature', 'aggregated_importance').")
-                             st.session_state['shap_importance_df_agg'] = None # Ensure it's None
-                    except Exception as e_agg:
-                        st.sidebar.error(f"Failed to load aggregated importance: {e_agg}")
-                        st.session_state['shap_importance_df_agg'] = None
-                else:
-                    st.session_state['shap_importance_df_agg'] = None # Explicitly set to None if file not uploaded
+            # --- RE-ENABLE Importance Calculation on Load ---
+            with st.spinner("Calculating SHAP importance (from sample)..."):
+                 st.session_state['shap_importance_df_raw'] = calculate_global_shap_importance(
+                     st.session_state['shap_data_dict']['shap_values'],
+                     st.session_state['shap_data_dict']['feature_names']
+                 )
+                 # Try to calculate aggregated importance if prediction data is loaded
+                 # This uses the full original_cols list from pred_df
+                 if st.session_state['pred_df'] is not None:
+                     try:
+                         cols_to_exclude_agg = ['y_true', 'y_pred_prob', 'ContactId', 'EntityId', 'ResponseTimestamp', 'rank', 'bin', 'group', '_merge']
+                         # Ensure Y_PRED_PROB_COL is excluded if different
+                         pred_data_ref = st.session_state['pred_df'] # Use the full pred_df to get original cols
+                         original_cols = [c for c in pred_data_ref.columns if c not in cols_to_exclude_agg]
 
-            else:
-                st.sidebar.error("Raw importance file missing required columns ('feature', 'feature_importance').")
-                st.session_state['shap_importance_df_raw'] = None # Ensure it's None
+                         st.session_state['shap_importance_df_agg'] = aggregate_shap_importance(
+                             st.session_state['shap_importance_df_raw'], # Importance from sample
+                             original_cols # Original feature list
+                         )
+                         if st.session_state['shap_importance_df_agg'] is None or st.session_state['shap_importance_df_agg'].empty:
+                              st.warning("Aggregated SHAP importance calculation resulted in empty DataFrame.")
+                     except Exception as agg_e:
+                          st.warning(f"Could not calculate aggregated SHAP importance: {agg_e}")
+                          st.session_state['shap_importance_df_agg'] = None
+                 else:
+                     st.session_state['shap_importance_df_agg'] = None
+            # Reset merged drift df might still be needed if importance changed
+            st.session_state['drift_importance_df'] = None
 
-        except Exception as e_raw:
-            st.sidebar.error(f"Failed to load raw importance: {e_raw}")
-            st.session_state['shap_importance_df_raw'] = None
+        else:
+            st.sidebar.error("Failed to load all required SAMPLED SHAP data components.")
+            st.session_state['shap_data_dict'] = None
+            st.session_state['shap_sampled_scores'] = None
+            st.session_state['shap_sampled_indices'] = None
+            st.session_state['shap_importance_df_raw'] = None # Ensure reset
             st.session_state['shap_importance_df_agg'] = None
+
+elif any(required_shap_files): # If some but not all required files are present
+    st.sidebar.warning("Please upload all required SHAP files (Values, Features, Base, Sampled Scores, Sampled Indices).")
+
 
 
 # --- >>> NEW: Dataset Selector for Analysis <<< ---
@@ -265,21 +334,18 @@ else:
     data_summary.append("ℹ️ Reference Data: **Not Loaded** (Optional)")
 
 # SHAP Data Status
-if st.session_state.get('shap_importance_df_raw') is not None:
-    shap_status = "✅ SHAP Importance: **Loaded (Pre-calculated)**"
-    shap_status += f" ({len(st.session_state['shap_importance_df_raw'])} processed features)"
-    if st.session_state.get('shap_importance_df_agg') is not None:
-         shap_status += f" ({len(st.session_state['shap_importance_df_agg'])} aggregated features)"
-    data_summary.append(shap_status)
-    # Add note that interactive plots are disabled
-    st.sidebar.info("Note: Interactive SHAP plots (Beeswarm, Dependence, Waterfall) are disabled when using pre-calculated importance.", icon="ℹ️")
-
-elif st.session_state.get('shap_data_dict') is not None: # Existing check if full data was loaded
-    shap_status = "✅ SHAP Data: **Loaded (Full)**"
-    # ... rest of existing status ...
+if st.session_state.get('shap_data_dict') is not None:
+    shap_status = "✅ SHAP Data: **Loaded (Sampled)**" # Indicate Sampled
+    n_samples_loaded = st.session_state['shap_data_dict']['shap_values'].shape[0]
+    shap_status += f" ({n_samples_loaded} samples)"
+    if st.session_state['shap_importance_df_raw'] is not None:
+         shap_status += f" ({len(st.session_state['shap_importance_df_raw'])} features)"
+    if st.session_state['shap_data_dict'].get('processed_data') is None:
+        shap_status += " *(Display Data missing)*"
     data_summary.append(shap_status)
 else:
-    data_summary.append("ℹ️ SHAP Data/Importance: **Not Loaded** (Optional)")
+    data_summary.append("ℹ️ SHAP Data: **Not Loaded** (Optional)")
+
 
 st.markdown("\n".join([f"- {s}" for s in data_summary]))
 
