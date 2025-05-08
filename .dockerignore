@@ -1,0 +1,25 @@
+# Exclude your local virtual environment
+venv/
+.venv/
+
+# Ignore caches and compiled files
+__pycache__/
+*.py[cod]
+
+# Git metadata and editor files
+.git/
+.gitignore
+*.swp
+*.swo
+
+# Local configuration or secrets
+.env
+.env.local
+credentials.json
+
+# CI/CD, docs, and other non-runtime files
+Dockerfile*
+docker-compose*.yml
+README.md
+docs/
+tests/
