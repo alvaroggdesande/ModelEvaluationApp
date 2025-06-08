@@ -320,7 +320,7 @@ if not plot_df_net_result.empty:
                   annotation_position="bottom right")
     #st.plotly_chart(fig_net_result, use_container_width=True)
 
-    fig_net_result.add_vline(x=current_targeting_percentage_on_plot, line_width=2, line_dash="dash", line_color="red",
+    fig_net_result.add_vline(x=current_targeting_percentage_on_plot*10, line_width=2, line_dash="dash", line_color="red",
                                annotation_text=annotation_text, annotation_position="top right") # Adjusted position
     st.plotly_chart(fig_net_result, use_container_width=True)
 
