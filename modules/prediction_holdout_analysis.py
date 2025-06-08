@@ -34,27 +34,13 @@ def _create_group_column(
 ) -> pd.Series:
     """
     Creates a grouping Series based on a feature column, handling numeric/categorical types and NaNs.
-
-    Args:
-        df: The input DataFrame.
-        feature: The name of the feature column to group by.
-        numeric_q: Number of quantile bins for numeric features. Required if feature is numeric.
-        cat_top_n: Number of top categories to keep for categorical features. Others are grouped into 'Other'.
-                   Required if feature is categorical/object.
-        include_nan: If True, create a separate 'NaN' group for missing values.
-
-    Returns:
-        A pandas Series with the group labels for each row.
-
-    Raises:
-        ValueError: If required parameters (numeric_q/cat_top_n) are missing for the feature type.
-        TypeError: If the feature column does not exist or has an unsupported type.
     """
     if feature not in df.columns:
         raise ValueError(f"Feature '{feature}' not found in DataFrame.")
 
     col = df[feature]
-    group_col = pd.Series(index=df.index, dtype=object) # Initialize with object dtype
+    # Initialize with object dtype to avoid inheriting restrictive categories early
+    group_col = pd.Series(index=df.index, dtype=object)
 
     # Identify NaNs upfront
     nan_mask = col.isna()
@@ -65,43 +51,53 @@ def _create_group_column(
             raise ValueError(f"numeric_q must be specified for numeric feature '{feature}'")
         if not non_nan_col.empty:
             try:
-                # Use labels=False first to get bin indices, then map to interval strings
                 bins, intervals = pd.qcut(non_nan_col, q=numeric_q, duplicates="drop", retbins=True, labels=False)
-                # Create meaningful labels from intervals
                 interval_strs = [f"{_format_bin_edge(intervals[i])}-{_format_bin_edge(intervals[i+1])}" for i in range(len(intervals)-1)]
-                 # Map bin indices back to interval strings - handle potential issues if qcut dropped bins
                 label_map = {idx: label for idx, label in enumerate(interval_strs)}
-                group_col[~nan_mask] = bins.map(label_map)
-                # Ensure all non-NaN rows got a label, handle cases where qcut might fail unexpectedly
-                group_col[~nan_mask] = group_col[~nan_mask].fillna("ErrorBinning")
+                # Use .loc for safer assignment
+                group_col.loc[~nan_mask] = bins.map(label_map)
+                # Fill any remaining NaNs in the non-NaN section (rare, but safety)
+                group_col.loc[~nan_mask] = group_col.loc[~nan_mask].fillna("ErrorBinning")
             except ValueError as e:
-                 # Handle cases like insufficient distinct values for qcut
                  warnings.warn(f"Could not create {numeric_q} bins for feature '{feature}'. Grouping as single bin. Error: {e}")
-                 group_col[~nan_mask] = "AllNumeric" # Group all non-NaN numeric as one
+                 group_col.loc[~nan_mask] = "AllNumeric"
         else:
             warnings.warn(f"Feature '{feature}' contains only NaN values.")
-            # Leave group_col as NaN for these rows, will be handled below
 
-    elif pd.api.types.is_object_dtype(col) or pd.api.types.is_categorical_dtype(col):
+    elif pd.api.types.is_object_dtype(col) or pd.api.types.is_categorical_dtype(col): # Handles both object and category inputs
         if cat_top_n is None:
              raise ValueError(f"cat_top_n must be specified for categorical/object feature '{feature}'")
         if not non_nan_col.empty:
-            cat_counts = non_nan_col.value_counts(dropna=False)
-            top_categories = cat_counts.index[:cat_top_n]
-            group_col[~nan_mask] = non_nan_col.where(non_nan_col.isin(top_categories), other="Other").astype(str)
+            cat_counts = non_nan_col.value_counts(dropna=False) # Check counts
+            # Ensure cat_top_n is not larger than the number of unique non-NaN values
+            actual_top_n = min(cat_top_n, len(cat_counts))
+            if actual_top_n < cat_top_n:
+                warnings.warn(f"Feature '{feature}' has only {actual_top_n} unique non-NaN values. Using top {actual_top_n}.")
+
+            top_categories = cat_counts.index[:actual_top_n]
+
+            # Convert the non-NaN part to object type BEFORE applying .where
+            # This prevents the Categorical error when creating "Other"
+            processed_groups = non_nan_col.astype(object).where(
+                non_nan_col.isin(top_categories), other="Other"
+            )
+
+            # Assign the results back using .loc
+            group_col.loc[~nan_mask] = processed_groups
+
         else:
              warnings.warn(f"Feature '{feature}' contains only NaN values.")
-             # Leave group_col as NaN, handled below
+
     else:
         raise TypeError(f"Unsupported data type for feature '{feature}': {col.dtype}")
 
     # Handle NaNs based on include_nan flag
     if include_nan:
-        group_col[nan_mask] = "NaN"
-    else:
-        group_col = group_col[~nan_mask] # Exclude NaN rows if not included
+        group_col.loc[nan_mask] = "NaN" # Use .loc for assignment
+    # No 'else' needed as we started with a full index Series
 
-    return group_col.astype('category') # Convert to category for potential memory efficiency
+    # Convert the final result to category for efficiency AFTER processing
+    return group_col.astype('category')
 
 # --- Custom Sorting Key for Group Labels ---
 def custom_sort_key(label: Union[str, float, int, None, pd.Interval]) -> float:

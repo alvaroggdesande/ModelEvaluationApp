@@ -58,98 +58,102 @@ max_display_features = st.sidebar.slider(
 )
 st.sidebar.caption(f"Plots use all {n_samples_sampled} samples loaded.")
 
-# --- Global Feature Importance ---
-st.subheader("Global Feature Importance (Calculated from Sample)") # Update title
-st.markdown("""
-Shows the average impact (mean absolute SHAP value) of each feature across the **sampled** data.
-Features are ordered by importance.
+# --- Global Feature Importance (Bar Plot - Using SHAP's Matplotlib plot) ---
+st.subheader("Global Feature Importance (Calculated from Sample)")
+st.markdown(f"""
+Shows the average impact (mean absolute SHAP value) of the top **{max_display_features}** features
+across the **sampled** data. Features are ordered by importance.
 """)
 
 if importance_df_raw is not None and not importance_df_raw.empty:
-    try:
-        # Create bar chart directly from importance_df_raw (using Plotly recommended)
-        import plotly.express as px
-        fig_imp = px.bar(
-            importance_df_raw.head(max_display_features),
-            x='feature_importance', y='feature', orientation='h',
-            title="Global Feature Importance (Sampled Data)",
-            labels={'feature_importance': 'Mean Absolute SHAP Value (from Sample)', 'feature': 'Feature'}
-        )
-        fig_imp.update_layout(yaxis={'categoryorder':'total ascending'})
-        st.plotly_chart(fig_imp, use_container_width=True)
+    # --- Create Explanation object required by shap.summary_plot ---
+    # Use the full sample data. The plot function will select top N.
+    use_display_data = False # Check if display data is valid for potential use by SHAP plot
+    if processed_data is not None:
+        if list(processed_data.columns) == feature_names and processed_data.shape == shap_values.shape:
+            use_display_data = True
 
-        # Optional: Expander for Aggregated Importance Table
+    explanation_full_sample = shap.Explanation(
+        values=shap_values,
+        base_values=base_value,
+        data=processed_data if use_display_data else None, # SHAP bar plot doesn't use display data, but good practice
+        feature_names=feature_names
+    )
+    # --- End Explanation object creation ---
+
+    try:
+        # --- Calculate dynamic figure height for Matplotlib ---
+        base_height_inches = 3  # Base height in inches
+        height_per_feature_inches = 0.3 # Inches to add per feature
+        num_features_to_plot = min(max_display_features, n_features_total)
+        dynamic_height_inches = base_height_inches + num_features_to_plot * height_per_feature_inches
+        # Standard width, dynamic height
+        fig_width_inches = 8 # Adjust as needed
+
+        # --- Create and size the Matplotlib figure BEFORE plotting ---
+        plt.figure(figsize=(fig_width_inches, dynamic_height_inches))
+
+        # --- Generate the SHAP bar plot (uses Matplotlib) ---
+        shap.summary_plot(
+            explanation_full_sample,
+            max_display=max_display_features, # Tell SHAP how many to show
+            plot_type='bar',
+            show=False # Prevent immediate display
+        )
+
+        # --- Adjust layout and display ---
+        plt.xlabel("Mean Absolute SHAP Value (Impact on Model Output)") # Set label explicitly
+        plt.title(f"Global Feature Importance - Top {num_features_to_plot} (Sampled Data)") # Add title
+        plt.tight_layout() # Try to adjust spacing automatically
+        st.pyplot(plt.gcf()) # Display the current figure in Streamlit
+        plt.clf() # Clear the figure context for the next plot
+
+        # Expander for Aggregated Importance Table (Keep this separate)
         if importance_df_agg is not None and not importance_df_agg.empty:
-            with st.expander("Show Aggregated Importance (Original Features - based on Sample)"):
+            with st.expander("Show Aggregated Importance Table (Original Features - based on Sample)"):
                 st.dataframe(importance_df_agg)
-        # else: st.caption("Aggregated importance data not available.") # Or if calculation failed
+        # else: st.caption("Aggregated importance data not available.")
 
     except Exception as e:
-        st.error(f"Could not generate importance bar plot: {e}")
+        st.error(f"Could not generate global importance bar plot: {e}")
+        st.error(traceback.format_exc()) # Show detailed error
 else:
     st.warning("Raw SHAP importance data (from sample) is not available.")
+
 
 st.markdown("---")
 
 # --- SHAP Summary Plot (Beeswarm) ---
+# Make sure this section uses the same 'explanation_full_sample' object created above
 st.subheader("SHAP Summary Plot (Beeswarm - Sampled Data)")
 st.markdown(f"""
-Visualizes the SHAP value distribution for the **top {max_display_features} most important features** across the **{n_samples_sampled} sampled instances**.
+Visualizes the SHAP value distribution for the top **{max_display_features} most important features** across the **{n_samples_sampled} sampled instances**.
 Importance for ordering is determined by mean absolute SHAP within this plot.
 - Color: Feature value (requires 'Display Data').
 """)
+if not use_display_data:
+     st.info("Coloring by feature value unavailable due to missing or invalid Display Data.")
 
-# --- Create Explanation object using FULL Sampled Data ---
-# This is the key change: Use the complete sample loaded into session state.
-# Ensure 'processed_data' is the DataFrame with column names matching 'feature_names'.
-use_display_data_for_color = False
-if processed_data is not None:
-    if list(processed_data.columns) == feature_names:
-         if processed_data.shape == shap_values.shape:
-              use_display_data_for_color = True
-         else:
-              st.warning("Display data shape mismatch with SHAP values. Cannot use for coloring.", icon="⚠️")
-    else:
-         st.warning("Display data column names mismatch with feature names. Cannot use for coloring.", icon="⚠️")
-
-explanation_full_sample = shap.Explanation(
-    values=shap_values,          # (n_samples_sampled, n_features_total)
-    base_values=base_value,      # Single value or array matching samples
-    data=processed_data if use_display_data_for_color else None, # (n_samples_sampled, n_features_total) - Use only if valid
-    feature_names=feature_names  # List (n_features_total)
-)
-# --- End Explanation object creation ---
-
-
-# --- Generate Beeswarm Plot using the Explanation object ---
-# Let summary_plot handle selecting top N based on the explanation data
 try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        plt.figure()
-        # Pass the full explanation object and max_display
+        plt.figure() # Start a new figure context
+
         shap.summary_plot(
-            explanation_full_sample,
-            max_display=max_display_features, # Let the plot function select top N
-            plot_type='dot',                  # Specify beeswarm type
+            explanation_full_sample, # <<< Use the SAME explanation object
+            max_display=max_display_features,
+            plot_type='dot', # Specify beeswarm type
             show=False
         )
         plt.title(f"SHAP Summary Plot - Top Features ({n_samples_sampled} Sampled Instances)")
         plt.xlabel("SHAP Value (Impact on Model Output)")
         plt.tight_layout()
         st.pyplot(plt.gcf())
-        plt.clf() # Clear figure after displaying
+        plt.clf()
 
 except Exception as e:
       st.error(f"Could not generate beeswarm plot: {e}")
-      st.error(traceback.format_exc()) # Show full error in app
-
-# Display notes about coloring
-if processed_data is not None and not use_display_data_for_color:
-    st.info("Coloring by feature value unavailable due to data mismatch (check warnings above).")
-elif processed_data is None:
-     st.info("Load 'Display Data' on Home page sidebar to enable coloring by feature value.")
-
+      st.error(traceback.format_exc())
 st.markdown("---")
 
 # --- SHAP Dependence Plots ---
