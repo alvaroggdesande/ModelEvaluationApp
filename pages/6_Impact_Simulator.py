@@ -220,9 +220,10 @@ with row1_col2:
     cm_breakdown_col1, cm_breakdown_col2 = st.columns(2)
     with cm_breakdown_col1:
         st.markdown(f"**TP (True Positives): {TP:,}**<br><small>Actual donors correctly contacted.</small>", unsafe_allow_html=True)
-        st.markdown(f"**FN (False Negatives): {FN:,}**<br><small>Actual donors we missed.</small>", unsafe_allow_html=True)
-    with cm_breakdown_col2:
         st.markdown(f"**FP (False Positives): {FP:,}**<br><small>Non-donors mistakenly contacted.</small>", unsafe_allow_html=True)
+
+    with cm_breakdown_col2:
+        st.markdown(f"**FN (False Negatives): {FN:,}**<br><small>Actual donors we missed.</small>", unsafe_allow_html=True)
         st.markdown(f"**TN (True Negatives): {TN:,}**<br><small>Non-donors correctly not contacted.</small>", unsafe_allow_html=True)
 
 # Add a more prominent separator before the financial comparison
@@ -276,48 +277,6 @@ if not scores_donors.empty or not scores_non_donors.empty: # Allow plotting even
     st.plotly_chart(fig_dist, use_container_width=True)
 else:
     st.warning("Not enough data to plot score distributions.")
-
-# ROC, PR, Rank-based plots
-if len(eval_df_sim['y_true'].unique()) > 1: # Check if calculable
-    col_curves1, col_curves2 = st.columns(2)
-    with col_curves1:
-        fig_roc = plot_roc_curve_interactive(eval_df_sim['y_true'], eval_df_sim['y_pred_prob'], title=f"ROC Curve")
-        st.plotly_chart(fig_roc, use_container_width=True)
-
-        fig_pr = plot_pr_curve_interactive(eval_df_sim['y_true'], eval_df_sim['y_pred_prob'], title=f"PR Curve")
-        st.plotly_chart(fig_pr, use_container_width=True)
-
-    with col_curves2:
-        num_rank_bins_sim = st.select_slider( # select_slider is better for few discrete choices
-            "Number of Rank Bins for Curves:",
-            options=[5, 10, 20], value=10, key="rank_bins_sim_curves"
-        )
-        rank_metrics_df_sim = calculate_rank_metrics(
-            df=eval_df_sim,
-            y_true_col='y_true',
-            y_pred_col='y_pred_prob',
-            num_bins=num_rank_bins_sim
-        )
-        if not rank_metrics_df_sim.empty:
-            current_targeting_percentage_on_plot = (num_to_target / TOTAL_POPULATION) * 100 if TOTAL_POPULATION > 0 else 0
-            annotation_text = f"Targeting Top {num_to_target / TOTAL_POPULATION:.0%}" if TOTAL_POPULATION > 0 else "Targeting 0%"
-
-            fig_rank_pr = plot_rank_metrics_interactive(rank_metrics_df_sim, title=f"Precision & Recall vs. Top %")
-            fig_rank_pr.add_vline(x=current_targeting_percentage_on_plot, line_width=2, line_dash="dash", line_color="red",
-                                  annotation_text=annotation_text, annotation_position="bottom right")
-            st.plotly_chart(fig_rank_pr, use_container_width=True)
-
-            fig_lift = plot_lift_chart_interactive(rank_metrics_df_sim, title=f"Lift Chart")
-            fig_lift.add_vline(x=current_targeting_percentage_on_plot, line_width=2, line_dash="dash", line_color="red",
-                               annotation_text=annotation_text, annotation_position="top right") # Adjusted position
-            st.plotly_chart(fig_lift, use_container_width=True)
-        else:
-            st.warning("Could not calculate rank metrics for these curves (e.g., too few data points or bins).")
-else:
-    st.warning("Overall performance curves (ROC, PR, etc.) cannot be generated as there's only one class in the 'Actual Donors' data for the current scenario settings.")
-
-
-st.markdown("---")
 
 # --- Display Section 3: Exploring Different Targeting Levels ---
 st.subheader("Exploring Net Financial Result vs. Number Contacted")
@@ -383,6 +342,51 @@ if not plot_df_net_result.empty:
 
 else:
     st.warning("Could not generate data for the 'Net Financial Result vs. Number Contacted' chart.")
+
+
+# ROC, PR, Rank-based plots
+num_rank_bins_sim = st.select_slider( # select_slider is better for few discrete choices
+            "Number of Rank Bins for Curves:",
+            options=[5, 10, 20], value=10, key="rank_bins_sim_curves"
+        )
+if len(eval_df_sim['y_true'].unique()) > 1: # Check if calculable
+    col_curves1, col_curves2 = st.columns(2)
+    with col_curves1:
+        fig_roc = plot_roc_curve_interactive(eval_df_sim['y_true'], eval_df_sim['y_pred_prob'], title=f"ROC Curve")
+        st.plotly_chart(fig_roc, use_container_width=True)
+
+        fig_pr = plot_pr_curve_interactive(eval_df_sim['y_true'], eval_df_sim['y_pred_prob'], title=f"PR Curve")
+        st.plotly_chart(fig_pr, use_container_width=True)
+
+    with col_curves2:
+
+        rank_metrics_df_sim = calculate_rank_metrics(
+            df=eval_df_sim,
+            y_true_col='y_true',
+            y_pred_col='y_pred_prob',
+            num_bins=num_rank_bins_sim
+        )
+        if not rank_metrics_df_sim.empty:
+            current_targeting_percentage_on_plot = (num_to_target / TOTAL_POPULATION) * 100 if TOTAL_POPULATION > 0 else 0
+            annotation_text = f"Targeting Top {num_to_target / TOTAL_POPULATION:.0%}" if TOTAL_POPULATION > 0 else "Targeting 0%"
+
+            fig_rank_pr = plot_rank_metrics_interactive(rank_metrics_df_sim, title=f"Precision & Recall vs. Top %")
+            fig_rank_pr.add_vline(x=current_targeting_percentage_on_plot, line_width=2, line_dash="dash", line_color="red",
+                                  annotation_text=annotation_text, annotation_position="bottom right")
+            st.plotly_chart(fig_rank_pr, use_container_width=True)
+
+            fig_lift = plot_lift_chart_interactive(rank_metrics_df_sim, title=f"Lift Chart")
+            fig_lift.add_vline(x=current_targeting_percentage_on_plot, line_width=2, line_dash="dash", line_color="red",
+                               annotation_text=annotation_text, annotation_position="top right") # Adjusted position
+            st.plotly_chart(fig_lift, use_container_width=True)
+        else:
+            st.warning("Could not calculate rank metrics for these curves (e.g., too few data points or bins).")
+else:
+    st.warning("Overall performance curves (ROC, PR, etc.) cannot be generated as there's only one class in the 'Actual Donors' data for the current scenario settings.")
+
+
+st.markdown("---")
+
 
 st.markdown("---")
 st.subheader("How to Interpret This Simulator:")
