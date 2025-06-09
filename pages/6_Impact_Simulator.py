@@ -73,12 +73,22 @@ def load_or_generate_simulated_data(total_pop_func_arg, actual_donors_func_arg):
     sim_df = pd.DataFrame({'person_id': person_ids, 'y_true': y_true})
 
     model_scenarios = {
-        "Perfect Model (AUC=1)": "perfect",
-        "Excellent Model": (0.85, 0.10, 0.15, 0.10), # Donor (mean, std), Non-Donor (mean, std)
-        "Good Model": (0.75, 0.12, 0.25, 0.12),
-        "Mediocre Model": (0.60, 0.18, 0.40, 0.18),
-        "Poor Model": (0.55, 0.20, 0.45, 0.20),
-        "Random Guessing": (0.50, 0.25, 0.50, 0.25) # More overlap
+        "Perfect Model (AUC=1.0)": "perfect", # Deterministic
+
+        # Aiming for AUC ~0.90-0.95 (Still very distinct, minimal overlap)
+        "Excellent Model (AUC ~0.92)": (0.68, 0.15, 0.38, 0.15), # Donor(mean,std), Non-Donor(mean,std). Increased non-donor mean slightly.
+
+        # Aiming for AUC ~0.80-0.85 (Good separation, but clear overlap now)
+        "Good Model (AUC ~0.83)": (0.65, 0.16, 0.42, 0.16), # Increased std for more overlap, means closer.
+
+        # Aiming for AUC ~0.70-0.75 (Significant overlap, clearly not "great")
+        "Fair Model (AUC ~0.72)": (0.60, 0.18, 0.45, 0.18), # Means even closer, std larger.
+
+        # Aiming for AUC ~0.60-0.65 (Very heavy overlap, model is struggling)
+        "Poor Model (AUC ~0.63)": (0.55, 0.20, 0.50, 0.20), # Means very close, large std.
+
+        # Aiming for AUC ~0.50 (Effectively random)
+        "Random Guessing (AUC ~0.50)": (0.50, 0.22, 0.50, 0.22) # Same means, wide std.
     }
 
     for name, params in model_scenarios.items():
