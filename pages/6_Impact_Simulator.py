@@ -183,36 +183,65 @@ net_gain_loss_all = donations_received_all - cost_of_mailing_all
 st.subheader(f"Interactive Outcome: Targeting Top {num_to_target:,} ({num_to_target/TOTAL_POPULATION:.1%} of List)")
 st.markdown(f"Using **{selected_model_name}** to rank individuals.")
 
-col1_outcome, col2_outcome = st.columns(2)
+# --- Row 1: Performance and Confusion Matrix ---
+# This row will contain the non-financial metrics and the confusion matrix
+row1_col1, row1_col2 = st.columns(2)
 
-with col1_outcome:
+with row1_col1:
     st.markdown("##### Performance at this Targeting Level")
-    st.metric("Precision (Donors among contacted)", f"{precision:.2%}")
-    st.metric("Recall (Donors found out of all possible)", f"{recall:.2%}")
-    st.metric("Lift over Random", f"{lift:.2f}x")
+    st.metric("Precision (Donors among contacted)", f"{precision:.2%}",
+              help="Of all the people contacted, what percentage were actual donors? (TP / (TP + FP))")
+    st.metric("Recall (Donors found out of all possible)", f"{recall:.2%}",
+              help="Of all the actual donors in the full list, what percentage did we successfully contact? (TP / (TP + FN))")
+    st.metric("Lift over Random", f"{lift:.2f}x",
+              help="How many times better is this model at finding donors compared to random selection?")
 
-    st.markdown("##### Campaign Financials (Model-based)")
+with row1_col2:
+    st.markdown("##### Confusion Matrix")
+    cm_data = {
+        f'Predicted Donor (Targeted: {num_to_target:,})': [f"{TP:,}", f"{FP:,}"],
+        f'Predicted Non-Donor (Not Targeted: {(TOTAL_POPULATION - num_to_target):,})': [f"{FN:,}", f"{TN:,}"]
+    }
+    cm_df = pd.DataFrame(cm_data, index=[f'Actual Donor ({ACTUAL_DONORS_COUNT:,})', f'Actual Non-Donor ({ACTUAL_NON_DONORS_COUNT:,})'])
+    st.table(cm_df) # Using st.table as you mentioned you haven't changed this yet
+
+    # Explicitly show TP, FP, FN, TN with explanations (optional, but helpful)
+    st.markdown("###### Understanding the Matrix Cell Values:")
+    cm_breakdown_col1, cm_breakdown_col2 = st.columns(2)
+    with cm_breakdown_col1:
+        st.markdown(f"**TP (True Positives): {TP:,}**<br><small>Actual donors correctly contacted.</small>", unsafe_allow_html=True)
+        st.markdown(f"**FN (False Negatives): {FN:,}**<br><small>Actual donors we missed.</small>", unsafe_allow_html=True)
+    with cm_breakdown_col2:
+        st.markdown(f"**FP (False Positives): {FP:,}**<br><small>Non-donors mistakenly contacted.</small>", unsafe_allow_html=True)
+        st.markdown(f"**TN (True Negatives): {TN:,}**<br><small>Non-donors correctly not contacted.</small>", unsafe_allow_html=True)
+
+# Add a more prominent separator before the financial comparison
+st.markdown("<hr style='border:1px solid #e0e0e0; margin-top:1.5em; margin-bottom:1.5em;'>", unsafe_allow_html=True)
+
+# --- Row 2: Financial Comparison ---
+st.markdown("##### Campaign Financials: Model vs. Baseline") # A common subheader for the financial section
+fin_col1, fin_col2 = st.columns(2) # New columns specifically for aligned financials
+
+with fin_col1:
+    # Centered sub-subheader for this column
+    st.markdown("<p style='text-align:center; font-weight:bold;'>Model-Based Approach</p>", unsafe_allow_html=True)
     st.metric("Letters Sent", f"{letters_sent:,}")
     st.metric("Cost of Mailing", f"{cost_of_mailing:,.2f} €")
     st.metric("Donations Received", f"{donations_received_model:,.2f} €")
-    st.metric("Net Financial Result", f"{net_gain_loss_model:,.2f} €")
+    delta_vs_baseline_net = net_gain_loss_model - net_gain_loss_all
+    st.metric("Net Financial Result", f"{net_gain_loss_model:,.2f} €",
+              delta=f"{delta_vs_baseline_net:,.2f} € vs Baseline",
+              help="Difference in net result compared to contacting everyone.")
 
-with col2_outcome:
-    st.markdown("##### Confusion Matrix")
-    cm_data = {
-        f'Predicted Donor ({num_to_target:,})': [f"{TP:,}", f"{FP:,}"],
-        f'Predicted Non-Donor ({(TOTAL_POPULATION - num_to_target):,})': [f"{FN:,}", f"{TN:,}"]
-    }
-    cm_df = pd.DataFrame(cm_data, index=[f'Actual Donor ({ACTUAL_DONORS_COUNT:,})', f'Actual Non-Donor ({ACTUAL_NON_DONORS_COUNT:,})'])
-    st.table(cm_df)
-
-    st.markdown("##### Baseline: Contacting Everyone")
+with fin_col2:
+    # Centered sub-subheader for this column
+    st.markdown("<p style='text-align:center; font-weight:bold;'>Baseline (Contacting Everyone)</p>", unsafe_allow_html=True)
     st.metric("Letters Sent (All)", f"{TOTAL_POPULATION:,}")
     st.metric("Cost of Mailing (All)", f"{cost_of_mailing_all:,.2f} €")
     st.metric("Donations Received (All)", f"{donations_received_all:,.2f} €")
     st.metric("Net Financial Result (All)", f"{net_gain_loss_all:,.2f} €")
 
-st.markdown("---")
+st.markdown("---") # Standard separator after this section
 
 # --- Display Section 2: Selected Model's Overall Characteristics ---
 st.subheader(f"Overall Characteristics of '{selected_model_name}'")
