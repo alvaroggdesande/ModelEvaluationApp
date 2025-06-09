@@ -318,26 +318,33 @@ results_over_n = []
 n_points_line_chart = 20 # Number of points on the line chart
 min_target_level_chart = max(1, int(TOTAL_POPULATION * 0.01)) # Start from at least 1% or 1 person
 if TOTAL_POPULATION <= n_points_line_chart: # If population is small, use all integer steps
-    target_levels = np.arange(1, TOTAL_POPULATION + 1)
+    target_levels = np.arange(min_target_level_chart, TOTAL_POPULATION + 1) # Ensure it starts from min_target_level_chart
+    if not target_levels.size: # If TOTAL_POPULATION < min_target_level_chart, make it just TOTAL_POPULATION
+        target_levels = np.array([TOTAL_POPULATION]) if TOTAL_POPULATION > 0 else np.array([1])
 else:
     target_levels = np.unique(np.linspace(min_target_level_chart, TOTAL_POPULATION, num=n_points_line_chart, dtype=int))
 
+if not np.any(target_levels): # If target_levels is empty or all zeros
+    st.warning("Cannot generate target levels for the net result chart with current population settings.")
+    plot_df_net_result = pd.DataFrame() # Ensure it's defined
+else:
+    for n_contact in target_levels:
+        if n_contact == 0 and TOTAL_POPULATION > 0: continue
+        if n_contact > TOTAL_POPULATION : continue # Should be handled by linspace, but good check
 
-for n_contact in target_levels:
-    if n_contact == 0 and TOTAL_POPULATION > 0: continue
-    if n_contact > TOTAL_POPULATION : continue
-
-    _targeted_df = working_df.head(n_contact) # working_df is already sorted
-    _tp = _targeted_df['y_true'].sum()
-    _cost = n_contact * cost_per_letter
-    _donations = _tp * avg_donation_amount
-    results_over_n.append({
-        'N Contacted': n_contact,
-        'Net Result (€)': _donations - _cost,
-        'Donors Found': _tp,
-        '% Contacted': (n_contact / TOTAL_POPULATION) * 100 if TOTAL_POPULATION > 0 else 0
-    })
-plot_df_net_result = pd.DataFrame(results_over_n)
+        # Ensure working_df is defined and sorted correctly from earlier in your script
+        # working_df should be sim_data_df sorted by selected_model_name
+        _targeted_df = working_df.head(n_contact)
+        _tp = _targeted_df['y_true'].sum()
+        _cost = n_contact * cost_per_letter
+        _donations = _tp * avg_donation_amount
+        results_over_n.append({
+            'N Contacted': n_contact,
+            'Net Result (€)': _donations - _cost,
+            'Donors Found': _tp,
+            '% Contacted': (n_contact / TOTAL_POPULATION) * 100 if TOTAL_POPULATION > 0 else 0
+        })
+    plot_df_net_result = pd.DataFrame(results_over_n)
 
 if not plot_df_net_result.empty:
     fig_net_result = px.line(plot_df_net_result, x='N Contacted', y='Net Result (€)', markers=True,
@@ -347,10 +354,21 @@ if not plot_df_net_result.empty:
     fig_net_result.add_hline(y=net_gain_loss_all, line_dash="dot",
                   annotation_text=f"Baseline (Contact All): {net_gain_loss_all:,.0f} €",
                   annotation_position="bottom right")
-    #st.plotly_chart(fig_net_result, use_container_width=True)
 
-    fig_net_result.add_vline(x=current_targeting_percentage_on_plot*10, line_width=2, line_dash="dash", line_color="red",
-                               annotation_text=annotation_text, annotation_position="top right") # Adjusted position
+    # --- CORRECTED VLINE ---
+    # The x-value for the vline should be num_to_target (the absolute number from the slider)
+    # The annotation text can still show the percentage for clarity
+    current_targeting_absolute = num_to_target # This is the value from your slider
+    annotation_text_vline = f"Current Target: {num_to_target:,} ({num_to_target/TOTAL_POPULATION:.0%})" if TOTAL_POPULATION > 0 else f"Current Target: {num_to_target:,}"
+
+    fig_net_result.add_vline(
+        x=current_targeting_absolute, # Use the absolute number of contacts
+        line_width=2,
+        line_dash="dash",
+        line_color="red",
+        annotation_text=annotation_text_vline,
+        annotation_position="top right" # You might need to adjust this position
+    )
     st.plotly_chart(fig_net_result, use_container_width=True)
 
 else:
