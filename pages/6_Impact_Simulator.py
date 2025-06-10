@@ -263,18 +263,58 @@ eval_df_sim = eval_df_sim.rename(columns={selected_model_name: 'y_pred_prob'})
 
 # Score Distribution Plot
 st.markdown("##### Score Distribution by Actual Outcome")
+st.markdown("How well does this model separate actual donors from actual non-donors?") # Added context
 scores_donors = sim_data_df[sim_data_df['y_true'] == 1][selected_model_name]
 scores_non_donors = sim_data_df[sim_data_df['y_true'] == 0][selected_model_name]
 
-if not scores_donors.empty or not scores_non_donors.empty: # Allow plotting even if one group is empty
+if not scores_donors.empty or not scores_non_donors.empty:
     fig_dist = plot_distribution_comparison_interactive(
         scores_donors,
         scores_non_donors,
-        name1=f"Actual Donors ({len(scores_donors):,})", # Use actual len here
+        name1=f"Actual Donors ({len(scores_donors):,})",
         name2=f"Actual Non-Donors ({len(scores_non_donors):,})",
         feature_name="Model Prediction Score"
     )
+
+    # --- ADDING THE VERTICAL LINE ---
+    # working_df is already sorted by selected_model_name descending from earlier calculations
+    threshold_score_for_vline = None
+    annotation_text_vline = ""
+
+    if num_to_target == 0:
+        # If no one is targeted, conceptually the threshold is above the max score (e.g., 1.0 or slightly higher for vis)
+        # Or, more practically, don't draw a line or draw it at 1.0.
+        # Let's draw it at 1.0 if nothing is targeted.
+        threshold_score_for_vline = 1.0
+        annotation_text_vline = "Target Threshold (None Targeted)"
+    elif num_to_target >= TOTAL_POPULATION and TOTAL_POPULATION > 0:
+        # If everyone (or more than everyone, due to slider step) is targeted,
+        # the threshold is effectively the minimum score in the dataset, or 0.
+        # Let's use the minimum score of the last person included.
+        threshold_score_for_vline = working_df[selected_model_name].min()
+        annotation_text_vline = f"Target Threshold (All Targeted): {threshold_score_for_vline:.2f}"
+    elif num_to_target > 0 and num_to_target < TOTAL_POPULATION:
+        # The (num_to_target)-th person (0-indexed) has the threshold score
+        # This is the score of the LAST person included in the 'num_to_target' group
+        threshold_score_for_vline = working_df[selected_model_name].iloc[num_to_target - 1]
+        annotation_text_vline = f"Target Threshold: {threshold_score_for_vline:.3f}" # More precision for score
+
+    if threshold_score_for_vline is not None:
+        fig_dist.add_vline(
+            x=threshold_score_for_vline,
+            line_width=2,
+            line_dash="dash",
+            line_color="red",
+            annotation_text=annotation_text_vline,
+            annotation_position="top left" # Adjust as needed (top right, bottom left, etc.)
+        )
+    # --- END OF ADDING VERTICAL LINE ---
+
     st.plotly_chart(fig_dist, use_container_width=True)
+    # Add a small explanation for the red line
+    if threshold_score_for_vline is not None:
+        st.caption(f"The vertical red line indicates the model score threshold ({threshold_score_for_vline:.3f}). Individuals with scores at or above this threshold are included in the 'Number to contact'.")
+
 else:
     st.warning("Not enough data to plot score distributions.")
 
