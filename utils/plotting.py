@@ -62,18 +62,39 @@ def plot_calibration_interactive(prob_pred, prob_true, title="Calibration Plot")
 
 def plot_rank_metrics_interactive(rank_metrics_df, title="Precision and Recall by Top % Targeted"):
     """Plots interactive Precision and Recall vs Top % using Plotly."""
-    fig = go.Figure()
+    color_map = {
+        'Precision': PLOT_COLOR_SEQUENCE[0],  # e.g. the first default Plotly color
+        'Recall':    PLOT_COLOR_SEQUENCE[6],  # e.g. the seventh default Plotly color
+    }
     pop_pct = rank_metrics_df['percentage_population'] * 100
-    fig.add_trace(go.Scatter(x=pop_pct, y=rank_metrics_df['cumulative_precision'],
-                             mode='lines+markers', name='Precision'))
-    fig.add_trace(go.Scatter(x=pop_pct, y=rank_metrics_df['cumulative_recall'],
-                             mode='lines+markers', name='Recall'))
+    fig = go.Figure()
+
+    # precision trace
+    fig.add_trace(go.Scatter(
+        x=pop_pct,
+        y=rank_metrics_df['cumulative_precision'],
+        mode='lines+markers',
+        name='Precision',
+        line=dict(color=color_map['Precision']),
+        marker=dict(color=color_map['Precision'])
+    ))
+
+    # recall trace
+    fig.add_trace(go.Scatter(
+        x=pop_pct,
+        y=rank_metrics_df['cumulative_recall'],
+        mode='lines+markers',
+        name='Recall',
+        line=dict(color=color_map['Recall']),
+        marker=dict(color=color_map['Recall'])
+    ))
+
     fig.update_layout(
         title=title,
         xaxis_title="Top % Population Targeted",
         yaxis_title="Precision / Recall",
         yaxis=dict(range=[0, 1.05]),
-        xaxis=dict(range=[0, 101]), # Extend slightly
+        xaxis=dict(range=[0, 101]),
         width=700, height=500,
         hovermode="x unified"
     )

@@ -125,8 +125,14 @@ st.sidebar.header("Campaign Settings")
 cost_per_letter = st.sidebar.number_input("Cost per Letter (€)", value=1.00, min_value=0.01, step=0.01, format="%.2f")
 avg_donation_amount = st.sidebar.number_input("Average Donation Amount (€)", value=25.00, min_value=1.00, step=1.00, format="%.2f")
 
-model_names_list = [col for col in sim_data_df.columns if col not in ['person_id', 'y_true']]
-selected_model_name = st.sidebar.selectbox("Select Model Simulation", model_names_list)
+model_names_list = [c for c in sim_data_df.columns if c not in ['person_id', 'y_true']]
+default_idx = max(0, len(model_names_list) - 1)
+
+selected_model_name = st.sidebar.selectbox(
+    "Select Model Simulation",
+    model_names_list,
+    index=default_idx
+)
 
 # Calculate and display AUC for the selected model simulation
 y_true_for_auc = sim_data_df['y_true']
@@ -429,19 +435,31 @@ st.markdown("---")
 
 
 st.markdown("---")
-st.subheader("How to Interpret This Simulator:")
+st.subheader("How to Use the Simulator:")
 st.markdown("""
-- **Scenario Settings:** Adjust `Total Potential Donors` and `Actual Donors if All Contacted` in the sidebar to match different campaign sizes or baseline conversion rates.
-- **Model Quality (AUC):** In the sidebar, select different `Model Simulation` types. Notice how the "Selected Model AUC" changes. Generally, higher AUC models (like "Excellent Model") will show better separation in the "Score Distribution" plot and lead to better financial outcomes or efficiency.
-- **"Perfect Model (AUC=1)":** Use this to discuss **overfitting**. While it looks ideal here (perfect separation), explain that if a model performs *this* perfectly on data it was *trained* on, it might have just memorized that data and could fail on new, unseen data. This highlights the need for proper testing on holdout sets.
-- **Targeting Slider (`Number to contact`):** This is the key interactive element. As you move it:
-    - **Observe Changes in Section 1:**
-        - **Precision vs. Recall:** If you target few people (slider to the left), precision might be high (for good models) but recall (total donors found) will be low. As you target more (slider to the right), recall increases, but precision often drops.
-        - **Confusion Matrix:** See how TP, FP, FN, TN numbers change. This directly shows who you're correctly/incorrectly targeting or missing.
-        - **Financials:** The "Net Financial Result" is crucial. Targeting too few might mean low net gain because you miss donors. Targeting too many increases costs and might also reduce net gain if precision drops significantly.
-    - **Observe Highlight on Overall Curves (Section 2):** The red dashed line on the "Precision & Recall vs. Top %" and "Lift Chart" shows where your current `Number to contact` falls on the overall model performance curves. This connects your specific targeting decision to the model's general capabilities.
-- **Score Distribution Plot (Section 2):** This plot visualizes how well the selected model distinguishes between actual donors and non-donors based on their scores. Better models show more separation between the two distributions.
-- **Net Financial Result vs. Number Contacted (Section 3):** This line chart summarizes the financial impact across all possible targeting levels for the selected model. It often reveals an optimal range for `Number to contact` that maximizes net financial result. Compare this chart for different model qualities.
+1. **Setup**  
+   - Sidebar controls:  
+     - **Total Potential Donors**  
+     - **Actual Donors if All Contacted**  
+     - **Model Simulation** (AUC scenarios)
 
-This hands-on, scenario-based approach aims to make abstract machine learning concepts (like AUC, precision, recall) tangible and demonstrate their direct relevance to NGO operations and decision-making.
+2. **Model Quality (AUC)**  
+   - Higher AUC → better score separation  
+   - “Perfect Model” illustrates overfitting on training data
+
+3. **Targeting Slider (“Number to Contact”)**  
+   - **Few contacts** → high precision, low recall  
+   - **Many contacts** → high recall, lower precision  
+   - Watch TP/FP/FN/TN counts update live  
+   - See impact on **Net Financial Result**
+
+4. **Performance Curves**  
+   - **Precision & Recall vs. Top %**  
+   - **Lift Chart**  
+   - Red line marks your current slider position
+
+5. **Key Takeaway**  
+   - There’s an optimal contact range that maximizes net gain  
+   - Use these visuals to justify your targeting decision
+            
 """)
