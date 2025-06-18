@@ -28,7 +28,7 @@ st.title("Fundraising Campaign Impact Simulator")
 st.sidebar.header("Scenario Base Settings")
 TOTAL_POPULATION_INPUT = st.sidebar.number_input(
     "Total Potential Donors in List",
-    value=1000, min_value=50, max_value=50000, step=50, key="total_pop_sim" # Min value 50 for more stable plots
+    value=1000, min_value=50, max_value=100000, step=50, key="total_pop_sim" # Min value 50 for more stable plots
 )
 ACTUAL_DONORS_COUNT_INPUT = st.sidebar.number_input(
     "Actual Donors if All Contacted",
@@ -145,7 +145,7 @@ else:
 # Slider for number of people to target
 max_targetable_slider = TOTAL_POPULATION
 min_val_slider = min(max(1, int(TOTAL_POPULATION*0.01)), max_targetable_slider) # Min 1% or 1, but not more than total
-val_slider = min(max(min_val_slider, int(TOTAL_POPULATION*0.2)), max_targetable_slider) # Default 20% or min_val_slider
+val_slider = min(max(min_val_slider, int(TOTAL_POPULATION*1)), max_targetable_slider) # Default 20% or min_val_slider
 step_slider = max(1, int(TOTAL_POPULATION*0.01)) # Step 1% or 1
 
 num_to_target = st.sidebar.slider(
