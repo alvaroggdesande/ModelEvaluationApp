@@ -459,7 +459,7 @@ st.markdown("""
    - Red line marks your current slider position
 
 5. **Key Takeaway**  
-   - There’s an optimal contact range that maximizes net gain  
+   - There's an optimal contact range that maximizes net gain  
    - Use these visuals to justify your targeting decision
             
 """)
