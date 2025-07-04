@@ -9,6 +9,7 @@ from utils.data_loader import load_prediction_data
 from utils.shap_helpers import (load_shap_data
                                 , calculate_global_shap_importance
                                 , aggregate_shap_importance)
+from utils.gcs_helper import download_from_gcs
 # from utils.data_loader import extract_evaluation_data, reconstruct_feature_dataframe
 # Import your color definitions
 from utils.theme import (
@@ -17,6 +18,7 @@ from utils.theme import (
 )
 import plotly.io as pio
 import plotly.graph_objects as go
+import os
 
 # --- Create Custom Plotly Theme/Template ---
 custom_template = go.layout.Template()
@@ -93,13 +95,22 @@ with st.sidebar:
     st.image("allyy_2025_transparent_svg.svg", width=200)
 st.sidebar.header("Load Datasets")
 
+# Look for model ID
+model_id = st.query_params.get("modelId")
+environment = os.environ.get("ST_ENVIRONMENT", "test")
+
 # --- Prediction Data Uploader ---
-uploaded_pred_file = st.sidebar.file_uploader(
-    "1. Upload Prediction/Holdout Data*",
-    type=["csv", "parquet"],
-    help="Required. Features, true labels ('y_true'), prediction scores ('y_pred_prob').",
-    key="pred_uploader"
-)
+uploaded_pred_file = None
+if model_id:
+    uploaded_pred_file=download_from_gcs(f"allyy-streamlit-{environment}", f"{model_id}/prediction_dataset.parquet")
+else:
+    uploaded_pred_file = st.sidebar.file_uploader(
+        "1. Upload Prediction/Holdout Data*",
+        type=["csv", "parquet"],
+        help="Required. Features, true labels ('y_true'), prediction scores ('y_pred_prob').",
+        key="pred_uploader"
+    )
+
 if uploaded_pred_file is not None:
     if st.session_state.get('pred_file_name') != uploaded_pred_file.name:
         pred_df_loaded = load_prediction_data(uploaded_file=uploaded_pred_file)
@@ -116,12 +127,19 @@ if uploaded_pred_file is not None:
             st.session_state['pred_df'] = None
 
 # --- Reference Data Uploader ---
-uploaded_ref_file = st.sidebar.file_uploader(
-    "2. Upload Reference/Training Data (Optional)",
-    type=["csv", "parquet"],
-    help="Optional. For drift analysis and comparison.",
-    key="ref_uploader"
-)
+uploaded_ref_file = None
+if model_id:
+    uploaded_ref_file=download_from_gcs(f"allyy-streamlit-{environment}", f"{model_id}/test_dataset.parquet")
+    print(f"model id: {model_id}")
+else:
+    uploaded_ref_file = st.sidebar.file_uploader(
+        "2. Upload Reference/Training Data (Optional)",
+        type=["csv", "parquet"],
+        help="Optional. For drift analysis and comparison.",
+        key="ref_uploader"
+    )
+    ref_file_cache_key = uploaded_ref_file.name if uploaded_ref_file else None
+
 if uploaded_ref_file is not None:
     if st.session_state.get('ref_file_name') != uploaded_ref_file.name:
         ref_df_loaded = load_prediction_data(uploaded_file=uploaded_ref_file)
@@ -135,39 +153,52 @@ if uploaded_ref_file is not None:
             st.sidebar.error("Failed to load reference data.")
             st.session_state['ref_df'] = None
 
-# --- >>> REVERTED: SHAP Data Uploaders <<< ---
-st.sidebar.markdown("---")
-st.sidebar.header("Load SHAP Data (Sampled)") # Update header
-st.sidebar.caption("Explainability uses data from a SAMPLE.") # Add caption
+# SHAP values upload
+uploaded_shap_values_file = None
+uploaded_shap_features_file = None
+uploaded_shap_base_value_file = None
+uploaded_shap_processed_data_file = None
+uploaded_shap_sampled_scores_file = None
+uploaded_shap_sampled_indices_file = None
+if model_id:
+    uploaded_shap_values_file=download_from_gcs(f"allyy-streamlit-{environment}", f"{model_id}/shap_values_sampled.npy")
+    uploaded_shap_features_file=download_from_gcs(f"allyy-streamlit-{environment}", f"{model_id}/shap_features.json")
+    uploaded_shap_base_value_file=download_from_gcs(f"allyy-streamlit-{environment}", f"{model_id}/shap_base_value.json")
+    uploaded_shap_processed_data_file=download_from_gcs(f"allyy-streamlit-{environment}", f"{model_id}/shap_display_data_sampled.parquet")
+    uploaded_shap_sampled_scores_file=download_from_gcs(f"allyy-streamlit-{environment}", f"{model_id}/shap_sampled_scores.npy")
+    uploaded_shap_sampled_indices_file=download_from_gcs(f"allyy-streamlit-{environment}", f"{model_id}/shap_sampled_indices.npy")
+else:
+    st.sidebar.markdown("---")
+    st.sidebar.header("Load SHAP Data (Sampled)") # Update header
+    st.sidebar.caption("Explainability uses data from a SAMPLE.") # Add caption
 
-# Revert to original 4 SHAP file uploaders
-uploaded_shap_values_file = st.sidebar.file_uploader(
-    "3. SHAP Values (Sampled)", # Updated label
-    type=["npy"], help=".npy array (samples x features) - From Sampled Data", key="shap_values_uploader"
-)
-uploaded_shap_features_file = st.sidebar.file_uploader(
-    "4. SHAP Feature Names (Full List)", # Updated label
-    type=["json", "txt"], help=".json list or .txt (one per line) - Full list matching columns", key="shap_features_uploader"
-)
-uploaded_shap_base_value_file = st.sidebar.file_uploader(
-    "5. SHAP Base Value",
-    type=["json", "txt"], help=".json {'base_value': x} or .txt (single number)", key="shap_base_uploader"
-)
-uploaded_shap_processed_data_file = st.sidebar.file_uploader(
-    "6. Display Data (Sampled)*", # Updated label
-    type=["parquet", "csv"],
-    help="*Recommended: Data corresponding to SAMPLED SHAP values, inverse-transformed where possible.", # Updated help text
-    key="shap_data_uploader"
-)
-# --- NEW Uploaders for Sampled Scores/Indices ---
-uploaded_shap_sampled_scores_file = st.sidebar.file_uploader(
-    "7. Sampled Prediction Scores",
-    type=["npy"], help=".npy array (prediction probabilities for the SHAP sample)", key="shap_scores_uploader"
-)
-uploaded_shap_sampled_indices_file = st.sidebar.file_uploader(
-    "8. Sampled Original Indices",
-    type=["npy"], help=".npy array (original row indices of the SHAP sample)", key="shap_indices_uploader"
-)
+    uploaded_shap_values_file = st.sidebar.file_uploader(
+        "3. SHAP Values (Sampled)", # Updated label
+        type=["npy"], help=".npy array (samples x features) - From Sampled Data", key="shap_values_uploader"
+    )
+    uploaded_shap_features_file = st.sidebar.file_uploader(
+        "4. SHAP Feature Names (Full List)", # Updated label
+        type=["json", "txt"], help=".json list or .txt (one per line) - Full list matching columns", key="shap_features_uploader"
+    )
+    uploaded_shap_base_value_file = st.sidebar.file_uploader(
+        "5. SHAP Base Value",
+        type=["json", "txt"], help=".json {'base_value': x} or .txt (single number)", key="shap_base_uploader"
+    )
+    uploaded_shap_processed_data_file = st.sidebar.file_uploader(
+        "6. Display Data (Sampled)*", # Updated label
+        type=["parquet", "csv"],
+        help="*Recommended: Data corresponding to SAMPLED SHAP values, inverse-transformed where possible.", # Updated help text
+        key="shap_data_uploader"
+    )
+    # --- NEW Uploaders for Sampled Scores/Indices ---
+    uploaded_shap_sampled_scores_file = st.sidebar.file_uploader(
+        "7. Sampled Prediction Scores",
+        type=["npy"], help=".npy array (prediction probabilities for the SHAP sample)", key="shap_scores_uploader"
+    )
+    uploaded_shap_sampled_indices_file = st.sidebar.file_uploader(
+        "8. Sampled Original Indices",
+        type=["npy"], help=".npy array (original row indices of the SHAP sample)", key="shap_indices_uploader"
+    )
 
 
 # --- Reverted SHAP Loading Logic ---
